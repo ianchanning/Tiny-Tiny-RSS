@@ -572,8 +572,9 @@ class Pref_Feeds extends Handler_Protected {
 		$last_error = $this->dbh->fetch_result($result, 0, "last_error");
 
 		if ($last_error) {
-			print "&nbsp;<span title=\"".htmlspecialchars($last_error)."\"
-				class=\"feed_error\">(error)</span>";
+			print "&nbsp;<img src=\"images/error.png\" alt=\"(error)\"
+				style=\"vertical-align : middle\"
+				title=\"".htmlspecialchars($last_error)."\">";
 
 		}
 
@@ -1468,15 +1469,6 @@ class Pref_Feeds extends Handler_Protected {
 
 		print "<button dojoType=\"dijit.form.Button\" onclick=\"return clearFeedAccessKeys()\">".
 			__('Clear all generated URLs')."</button> ";
-
-		print "</p>";
-
-		print_warning(__("You can disable all articles shared by unique URLs here."));
-
-		print "<p>";
-
-		print "<button dojoType=\"dijit.form.Button\" onclick=\"return clearArticleAccessKeys()\">".
-			__('Unshare all articles')."</button> ";
 
 		print "</p>";
 

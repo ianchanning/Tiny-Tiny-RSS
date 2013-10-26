@@ -2,6 +2,7 @@
 class FeedParser {
 	private $doc;
 	private $error;
+	private $libxml_errors = array();
 	private $items;
 	private $link;
 	private $title;
@@ -18,21 +19,60 @@ class FeedParser {
 		$this->doc = new DOMDocument();
 		$this->doc->loadXML($data);
 
+		mb_substitute_character("none");
+
 		$error = libxml_get_last_error();
 
-		if ($error && $error->code == 9) {
-			libxml_clear_errors();
+		// libxml compiled without iconv?
+		if ($error && $error->code == 32) {
+			if (preg_match('/^(<\?xml[\t\n\r ].*?encoding[\t\n\r ]*=[\t\n\r ]*["\'])(.+?)(["\'].*?\?>)/s', $data, $matches) === 1) {
+				$data = mb_convert_encoding($data, 'UTF-8', $matches[2]);
 
-			// we might want to try guessing input encoding here too
-			$data = iconv("UTF-8", "UTF-8//IGNORE", $data);
+				$data = preg_replace('/^<\?xml[\t\n\r ].*?\?>/s', $matches[1] . "UTF-8" . $matches[3] , $data);
 
-			$this->doc = new DOMDocument();
-			$this->doc->loadXML($data);
+				if ($data) {
+					libxml_clear_errors();
 
-			$error = libxml_get_last_error();
+					$this->doc = new DOMDocument();
+					$this->doc->loadXML($data);
+
+					$error = libxml_get_last_error();
+				}
+			}
 		}
 
-		$this->error = $this->format_error($error);
+		// some terrible invalid unicode entity?
+		if ($error) {
+			foreach (libxml_get_errors() as $err) {
+				if ($err->code == 9) {
+					// remove dangling bytes
+					$data = mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+
+					// apparently not all UTF-8 characters are valid for XML
+					$data = preg_replace('/[^\x{0009}\x{000a}\x{000d}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]+/u', ' ', $data);
+
+					if ($data) {
+						libxml_clear_errors();
+
+						$this->doc = new DOMDocument();
+						$this->doc->loadXML($data);
+
+						$error = libxml_get_last_error();
+					}
+					break;
+				}
+			}
+		}
+
+		if ($error) {
+			foreach (libxml_get_errors() as $error) {
+				if ($error->level == LIBXML_ERR_FATAL) {
+					if(!isset($this->error)) //currently only the first error is reported
+						$this->error = $this->format_error($error);
+					$this->libxml_errors [] = $this->format_error($error);
+				}
+			}
+		}
 		libxml_clear_errors();
 
 		$this->items = array();
@@ -53,7 +93,7 @@ class FeedParser {
 
 		$root = $xpath->query("(//atom03:feed|//atom:feed|//channel|//rdf:rdf|//rdf:RDF)");
 
-		if ($root) {
+		if ($root && $root->length > 0) {
 			$root = $root->item(0);
 
 			if ($root) {
@@ -175,6 +215,10 @@ class FeedParser {
 
 	function error() {
 		return $this->error;
+	}
+
+	function errors() {
+		return $this->libxml_errors;
 	}
 
 	function get_link() {

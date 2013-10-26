@@ -97,12 +97,16 @@ class Pref_Filters extends Handler_Protected {
 		print "<table width=\"100%\" cellspacing=\"0\" id=\"prefErrorFeedList\">";
 
 		while ($line = $this->dbh->fetch_assoc($result)) {
+			$line["content_preview"] = truncate_string(strip_tags($line["content_preview"]), 100, '...');
+
+			foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
+					$line = $p->hook_query_headlines($line, 100);
+				}
 
 			$entry_timestamp = strtotime($line["updated"]);
 			$entry_tags = get_article_tags($line["id"], $_SESSION["uid"]);
 
-			$content_preview = truncate_string(
-				strip_tags($line["content_preview"]), 100, '...');
+			$content_preview = $line["content_preview"];
 
 			if ($line["feed_title"])
 				$feed_title = $line["feed_title"];
@@ -870,6 +874,11 @@ class Pref_Filters extends Handler_Protected {
 		print "</div>";
 
 		print "<div class=\"dlgButtons\">";
+
+		print "<div style=\"float : left\">
+			<a class=\"visibleLink\" target=\"_blank\" href=\"http://tt-rss.org/wiki/ContentFilters\">".__("Wiki: Filters")."</a>
+		</div>";
+
 
 		print "<button dojoType=\"dijit.form.Button\" onclick=\"return dijit.byId('filterNewRuleDlg').execute()\">".
 			($rule ? __("Save rule") : __('Add rule'))."</button> ";
